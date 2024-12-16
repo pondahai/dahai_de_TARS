@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TARS - Interstellar Companion</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #0a0a0a;
+            color: #00ffcc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Hide all scrollbars */
+        }
+        #container {
+            width: 90%;
+            max-width: 1200px;
+            display: flex;
+        }
+        #left-column {
+            width: 50%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #right-column {
+            width: 50%;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        #terminal {
+            width: 100%;
+            height: 400px;
+            background-color: #000;
+            border: 1px solid #00ffcc;
+            padding: 10px;
+            overflow: hidden; /* Hide scrollbar */
+            color: #00ffcc;
+            white-space: pre-wrap;
+            position: relative;
+        }
+        #api-settings {
+            margin-top: auto;
+        }
+        input, button, select {
+            padding: 10px;
+            margin: 5px;
+            border: none;
+            background-color: #1e1e1e;
+            color: #00ffcc;
+            border-radius: 5px;
+        }
+        #chatbox {
+            width: 100%;
+            height: 300px;
+            background-color: #1e1e1e;
+            padding: 10px;
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            white-space: pre-wrap;
+            position: relative;
+            overflow: hidden; /* Hide scrollbar */
+            flex-grow: 1;
+        }
+        .message {
+            margin: 5px 0;
+        }
+        .user {
+            text-align: right;
+        }
+        .tars {
+            text-align: left;
+        }
+        #led-light {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 20px;
+            height: 20px;
+            background-color: #00ff00;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00, 0 0 30px #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="left-column">
+            <div id="terminal">
+                Initializing TARS...
+            </div>
+        </div>
+        <div id="right-column">
+            <div id="chatbox"></div>
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button onclick="sendMessage()">Send</button>
+            <div id="api-settings">
+                <input type="text" id="api-url" placeholder="API URL (e.g., https://api.example.com)">
+                <input type="text" id="api-key" placeholder="API Key">
+                <select id="model-select">
+                    <option value="">Select Model</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div id="led-light"></div>
+
+    <script>
+        let conversationHistory = [
+            {
+                "role": "system",
+                "content": "You are TARS, the mission companion from the movie Interstellar. Answer in the language of the webpage. Do not include your name or any prefixes in your response."
+            }
+        ];
+
+        async function fetchModels() {
+            const apiUrl = document.getElementById('api-url').value;
+            const apiKey = document.getElementById('api-key').value;
+
+            if (!apiUrl || !apiKey) return;
+
+            try {
+                const response = await fetch(apiUrl + '/v1/models', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const models = data.data || [];
+                    const modelSelect = document.getElementById('model-select');
+                    modelSelect.innerHTML = '<option value="">Select Model</option>';
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = model.id;
+                        modelSelect.appendChild(option);
+                    });
+                } else {
+                    console.error('Error fetching models:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function sendMessage() {
+            const userInput = document.getElementById('user-input').value;
+            if (!userInput) return;
+
+            conversationHistory.push({
+                "role": "user",
+                "content": userInput
+            });
+
+            const chatbox = document.getElementById('chatbox');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user';
+            messageDiv.textContent = userInput;
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            document.getElementById('user-input').value = '';
+
+            const apiUrl = document.getElementById('api-url').value;
+            const apiKey = document.getElementById('api-key').value;
+            const model = document.getElementById('model-select').value;
+
+            const response = await fetch(apiUrl + '/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: conversationHistory,
+                    stream: true
+                })
+            });
+
+            if (response.ok) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let done = false;
+                let tarsResponse = '';
+
+                // Create a new message div for TARS response
+                const tarsMessageDiv = document.createElement('div');
+                tarsMessageDiv.className = 'message tars';
+                chatbox.appendChild(tarsMessageDiv);
+
+                while (!done) {
+                    const { value, done: readerDone } = await reader.read();
+                    done = readerDone;
+                    const chunk = decoder.decode(value, { stream: !done });
+
+                    // Parse the chunked response
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '' && line !== 'data: [DONE]');
+                    lines.forEach(line => {
+                        const data = JSON.parse(line.replace('data: ', ''));
+                        if (data.choices && data.choices[0].delta.content) {
+                            if (data.choices[0].delta.content.includes('<|eos|>')) {
+                                tarsResponse += data.choices[0].delta.content.replace('<|eos|>', '');
+                                done = true; // Stop further processing
+                            } else {
+                                tarsResponse += data.choices[0].delta.content;
+                            }
+                        }
+                    });
+
+                    // Update TARS's message div with the current response
+                    tarsMessageDiv.textContent = tarsResponse;
+                    chatbox.scrollTop = chatbox.scrollHeight;
+                }
+
+                conversationHistory.push({
+                    "role": "assistant",
+                    "content": tarsResponse
+                });
+
+                // Speak the response after it is complete
+                speakText(tarsResponse);
+            } else {
+                console.error('Error:', response.statusText);
+            }
+        }
+
+        function simulateTerminalOutput() {
+            const terminal = document.getElementById('terminal');
+            const symbols = "!@#$%^&*()-_=+[]{}|;:,.<>?/~`1234567890";
+            const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            const allChars = symbols + letters;
+            const checkMessages = [
+                "SystemCheck....OK",
+                "PowerLevel....CHECKED",
+                "Temperature....NORMAL",
+                "FuelLevel....SUFFICIENT",
+                "Communication....ACTIVE",
+                "Navigation....CALCULATING",
+                "LifeSupport....ONLINE",
+                "DataBackup....SUCCESSFUL",
+                "SecurityProtocol....ENGAGED"
+            ];
+
+            function getRandomChar() {
+                return allChars.charAt(Math.floor(Math.random() * allChars.length));
+            }
+
+            function getRandomCheckMessage() {
+                return checkMessages[Math.floor(Math.random() * checkMessages.length)];
+            }
+
+            function appendRandomText() {
+                if (Math.random() < 0.3) { // 30% chance to show a check message
+                    const checkMessage = getRandomCheckMessage();
+                    terminal.textContent += checkMessage + '\n';
+                } else {
+                    let randomText = '';
+                    for (let i = 0; i < Math.floor(Math.random() * 100) + 50; i++) {
+                        randomText += getRandomChar();
+                    }
+                    terminal.textContent += randomText + '\n';
+                }
+
+                // Ensure each line fills the terminal width
+                const lines = terminal.textContent.split('\n');
+                if (lines.length > 20) { // Keep only the last 20 lines
+                    terminal.textContent = lines.slice(-20).join('\n');
+                }
+
+                terminal.scrollTop = terminal.scrollHeight;
+
+                setTimeout(appendRandomText, Math.random() * 100 + 50); // Lowered speed to 50-150ms
+            }
+
+            appendRandomText();
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                // Remove punctuation
+                const cleanedText = text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+
+                const utterance = new SpeechSynthesisUtterance(cleanedText);
+                const voices = speechSynthesis.getVoices();
+                const language = document.documentElement.lang || 'en-US';
+                const voice = voices.find(v => v.lang === language) || voices[0];
+                utterance.voice = voice;
+                utterance.pitch = 1;
+                utterance.rate = 1.2;
+                utterance.volume = 1;
+                speechSynthesis.speak(utterance);
+            } else {
+                console.error('Speech synthesis is not supported in this browser.');
+            }
+        }
+
+        document.getElementById('api-url').addEventListener('input', fetchModels);
+        document.getElementById('api-key').addEventListener('input', fetchModels);
+
+        // Initialize terminal simulation
+        simulateTerminalOutput();
+    </script>
+</body>
+</html>
