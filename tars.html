@@ -46,6 +46,24 @@
         }
         #api-settings {
             margin-top: auto;
+            background-color: #1e1e1e;
+            border: 1px solid #00ffcc;
+            border-radius: 5px;
+            padding: 10px;
+            box-sizing: border-box;
+            transition: height 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+            height: 40px; /* Initial collapsed height */
+            opacity: 0.7; /* Initial opacity */
+        }
+        #api-settings.expanded {
+            height: 200px; /* Expanded height */
+            opacity: 1; /* Full opacity */
+        }
+        #api-settings-header {
+            cursor: pointer;
+            margin-bottom: 10px;
+            font-weight: bold;
         }
         input, button, select {
             padding: 10px;
@@ -66,6 +84,7 @@
             position: relative;
             overflow: hidden; /* Hide scrollbar */
             flex-grow: 1;
+            margin-bottom: 10px;
         }
         .message {
             margin: 5px 0;
@@ -100,6 +119,7 @@
             <input type="text" id="user-input" placeholder="Type your message...">
             <button onclick="sendMessage()">Send</button>
             <div id="api-settings">
+                <div id="api-settings-header">API Settings</div>
                 <input type="text" id="api-url" placeholder="API URL (e.g., https://api.example.com)">
                 <input type="text" id="api-key" placeholder="API Key">
                 <select id="model-select">
@@ -308,6 +328,18 @@
 
         // Initialize terminal simulation
         simulateTerminalOutput();
+
+        // Add event listener to toggle API settings on hover
+        document.getElementById('api-settings').addEventListener('mouseenter', () => {
+            document.getElementById('api-settings').classList.add('expanded');
+        });
+
+        document.getElementById('api-settings').addEventListener('mouseleave', () => {
+            document.getElementById('api-settings').classList.remove('expanded');
+        });
+
+        // Ensure model selection works correctly
+        document.getElementById('model-select').addEventListener('change', fetchModels);
     </script>
 </body>
 </html>
