@@ -137,6 +137,7 @@
                 "content": "You are TARS, the mission companion from the movie Interstellar. Answer in the language of the webpage. Do not include your name or any prefixes in your response."
             }
         ];
+        let selectedModel = "";
 
         async function fetchModels() {
             const apiUrl = document.getElementById('api-url').value;
@@ -163,6 +164,11 @@
                         option.textContent = model.id;
                         modelSelect.appendChild(option);
                     });
+
+                    // Restore the previously selected model if available
+                    if (selectedModel) {
+                        modelSelect.value = selectedModel;
+                    }
                 } else {
                     console.error('Error fetching models:', response.statusText);
                 }
@@ -192,6 +198,11 @@
             const apiUrl = document.getElementById('api-url').value;
             const apiKey = document.getElementById('api-key').value;
             const model = document.getElementById('model-select').value;
+
+            if (!model) {
+                alert('Please select a model.');
+                return;
+            }
 
             const response = await fetch(apiUrl + '/v1/chat/completions', {
                 method: 'POST',
@@ -323,23 +334,38 @@
             }
         }
 
-        document.getElementById('api-url').addEventListener('input', fetchModels);
-        document.getElementById('api-key').addEventListener('input', fetchModels);
-
-        // Initialize terminal simulation
-        simulateTerminalOutput();
-
-        // Add event listener to toggle API settings on hover
-        document.getElementById('api-settings').addEventListener('mouseenter', () => {
+        function expandApiSettings() {
             document.getElementById('api-settings').classList.add('expanded');
+        }
+
+        function collapseApiSettings() {
+            document.getElementById('api-settings').classList.remove('expanded');
+        }
+
+        document.getElementById('api-url').addEventListener('input', () => {
+            expandApiSettings();
+            fetchModels();
+        });
+
+        document.getElementById('api-key').addEventListener('input', () => {
+            expandApiSettings();
+            fetchModels();
+        });
+
+        document.getElementById('model-select').addEventListener('change', (event) => {
+            selectedModel = event.target.value;
+        });
+
+        document.getElementById('api-settings').addEventListener('mouseenter', () => {
+            expandApiSettings();
         });
 
         document.getElementById('api-settings').addEventListener('mouseleave', () => {
-            document.getElementById('api-settings').classList.remove('expanded');
+            collapseApiSettings();
         });
 
-        // Ensure model selection works correctly
-        document.getElementById('model-select').addEventListener('change', fetchModels);
+        // Initialize terminal simulation
+        simulateTerminalOutput();
     </script>
 </body>
 </html>
